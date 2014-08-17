@@ -1,0 +1,21 @@
+{
+  "name": "db",
+  "version": "0.0.0",
+  "description": "A pure js-only db",
+  "main": "db.js",
+  "dependencies": {
+    "keydir": "^2.1.0",
+    "skiplist": "^1.0.0",
+    "abstract-leveldown": "^0.12.3",
+    "protocol-buffers": "^2.3.4",
+    "snappy": "^3.0.3"
+  },
+  "devDependencies": {
+    "tape": "^2.14.0"
+  },
+  "scripts": {
+    "test": "tape test.js"
+  },
+  "author": "David Björklund <david.bjorklund@gmail.com> (http://davidbjorklund.com/)",
+  "license": "MIT"
+}
