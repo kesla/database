@@ -5,12 +5,13 @@
   "main": "db.js",
   "dependencies": {
     "abstract-leveldown": "^0.12.3",
+    "append-stream": "^1.2.2",
     "keydir": "^2.1.0",
     "leveldown-open": "^1.0.1",
     "protocol-buffers": "^2.3.4",
     "rimraf": "^2.2.8",
-    "skiplist": "^1.0.0",
-    "snappy": "^3.0.3"
+    "snappy": "^3.0.3",
+    "varint": "^3.0.1"
   },
   "devDependencies": {
     "tape": "^2.14.0"
