@@ -63,6 +63,8 @@ SimpleDOWN.prototype._open = function (options, callback) {
 SimpleDOWN.prototype._close = function (callback) {
   this.stream.end()
   fs.close(this.fd, callback)
+  this.keys = undefined
+  this.keydir = undefined
 }
 
 SimpleDOWN.prototype._append = function (data, callback) {
