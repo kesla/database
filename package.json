@@ -6,6 +6,7 @@
   "dependencies": {
     "abstract-leveldown": "^0.12.3",
     "keydir": "^2.1.0",
+    "leveldown-open": "^1.0.1",
     "protocol-buffers": "^2.3.4",
     "rimraf": "^2.2.8",
     "skiplist": "^1.0.0",

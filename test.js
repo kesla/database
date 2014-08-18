@@ -8,9 +8,9 @@ var test       = require('tape')
 
 require('abstract-leveldown/abstract/leveldown-test').args(medeaDOWN, test, testCommon)
 
-return
-
 require('abstract-leveldown/abstract/open-test').all(medeaDOWN, test, testCommon)
+
+return
 
 require('abstract-leveldown/abstract/del-test').all(medeaDOWN, test, testCommon)
 
