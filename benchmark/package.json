@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "medeadown": "^1.0.13",
+    "run-series": "^1.0.2"
+  }
+}
