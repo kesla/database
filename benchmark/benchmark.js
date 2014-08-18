@@ -1,93 +1,49 @@
-
-
-var series = require('run-series')
-
-  , medeadown = require('medeadown')
+var medeadown = require('medeadown')
   , simpledown = require('../db')
 
   , medea = medeadown(__dirname + '/medea')
   , simple = simpledown(__dirname + '/simple')
 
-  , getTasks = function (db) {
-      var tasks = []
+  , LARGE_VALUE = Array
+      .apply(null, new Array(500))
+      .map(function () { return 'boop' })
+      .join('')
 
-      for(var i = 0; i < 10000; ++i)(function (i) {
-        tasks.push(function (done) {
-          db.get('beep' + i, done)
-        })
-      })(i)
-      return tasks
-    }
-  , putTasks = function (db, value) {
-      var tasks = []
-
-      for(var i = 0; i < 10000; ++i)(function (i) {
-        tasks.push(function (done) {
-          db.put('beep' + i, value, done)
-        })
-      })(i)
-      return tasks
-    }
-  , run = function (name, tasks, done) {
-      console.time(name)
-      series(
-          tasks
-        , function () {
-            console.timeEnd(name)
-            done()
+  , get = function (db) {
+      return function * () {
+        for(var i = 0; i < 10000; ++i) {
+          yield function (done) {
+            db.get('beep' + i, done)
           }
-      )
-    }
-
-series([
-    medea.open.bind(medea)
-  , simple.open.bind(simple)
-  , function (done) {
-      var tasks = putTasks(medea, 'boop')
-
-      run('medea# put small', tasks, done)
-    }
-  , function (done) {
-      var tasks = getTasks(medea)
-
-      run('medea# get small', tasks, done)
-    }
-  , function (done) {
-      var value = Array
-            .apply(null, new Array(500))
-            .map(function () { return 'boop' })
-            .join('')
-        , tasks = putTasks(medea, value)
-
-      run('medea# put large', tasks, done)
-    }
-    , function (done) {
-        var tasks = getTasks(medea)
-
-        run('medea# get large', tasks, done)
+        }
       }
-  , function (done) {
-      var tasks = putTasks(simple, 'boop')
-
-      run('simple# put small', tasks, done)
     }
-  , function (done) {
-      var tasks = getTasks(simple)
-
-      run('simple# get small', tasks, done)
+  , put = function (db, value) {
+      return function * () {
+        for(var i = 0; i < 10000; ++i) {
+          yield function (done) {
+            db.put('beep' + i, value, done)
+          }
+        }
+      }
     }
-  , function (done) {
-      var value = Array
-            .apply(null, new Array(500))
-            .map(function () { return 'boop' })
-            .join('')
-        , tasks = putTasks(simple, value)
-
-      run('simple# put large', tasks, done)
+  , benchmark = function(name, yieldable) {
+      return function * () {
+        console.time(name)
+        yield yieldable
+        console.timeEnd(name)
+      }
     }
-  , function (done) {
-      var tasks = getTasks(simple)
 
-      run('simple# get large', tasks, done)
-    }
-])
+require('co')(function *() {
+  yield benchmark('medea.open', medea.open.bind(medea))
+  yield benchmark('simple.open', simple.open.bind(simple))
+  yield benchmark('medea.put small', put(medea, 'boop'))
+  yield benchmark('medea.get small', get(medea))
+  yield benchmark('medea.put large', put(medea, LARGE_VALUE))
+  yield benchmark('medea.get large', get(medea))
+  yield benchmark('simple.put small', put(simple, 'boop'))
+  yield benchmark('simple.get small', get(simple))
+  yield benchmark('simple.put large', put(simple, LARGE_VALUE))
+  yield benchmark('simple.get large', get(simple))
+})()

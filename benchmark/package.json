@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "medeadown": "^1.0.13",
-    "run-series": "^1.0.2"
+    "co": "^3.1.0",
+    "gnode": "0.0.8",
+    "medeadown": "^1.0.13"
   }
 }
