@@ -1,9 +1,6 @@
 var medeadown = require('medeadown')
   , simpledown = require('../db')
 
-  , medea = medeadown(__dirname + '/medea')
-  , simple = simpledown(__dirname + '/simple')
-
   , LARGE_VALUE = Array
       .apply(null, new Array(500))
       .map(function () { return 'boop' })
@@ -34,16 +31,21 @@ var medeadown = require('medeadown')
         console.timeEnd(name)
       }
     }
+  , dbs = [
+        { name: 'medea', instance: medeadown(__dirname + '/medea') }
+      , { name: 'simple', instance: simpledown(__dirname + '/simple') }
+    ]
 
 require('co')(function *() {
-  yield benchmark('medea.open', medea.open.bind(medea))
-  yield benchmark('simple.open', simple.open.bind(simple))
-  yield benchmark('medea.put small', put(medea, 'boop'))
-  yield benchmark('medea.get small', get(medea))
-  yield benchmark('medea.put large', put(medea, LARGE_VALUE))
-  yield benchmark('medea.get large', get(medea))
-  yield benchmark('simple.put small', put(simple, 'boop'))
-  yield benchmark('simple.get small', get(simple))
-  yield benchmark('simple.put large', put(simple, LARGE_VALUE))
-  yield benchmark('simple.get large', get(simple))
+  var db
+  for(var i = 0; i < dbs.length; ++i) {
+    var db = dbs[i]
+    yield benchmark(db.name + '.open', db.instance.open.bind(db.instance))
+    yield benchmark(db.name + '.put small', put(db.instance, 'boop'))
+    yield benchmark(db.name + '.get small', get(db.instance))
+    yield benchmark(db.name + '.put large', put(db.instance, LARGE_VALUE))
+    yield benchmark(db.name + '.get large', get(db.instance))
+    yield benchmark(db.name + '.close', db.instance.close.bind(db.instance))
+    console.log()
+  }
 })()
