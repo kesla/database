@@ -3,8 +3,11 @@ var fs = require('fs')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
   , appendStream = require('append-stream')
   , Data = require('protocol-buffers/require')('schema.proto').Data
+  , keydir = require('keydir')
   , open = require('leveldown-open')
   , varint = require('varint')
+
+  , SimpleIterator = require('./iterator')
 
   , SimpleDOWN = function (location) {
       if (!(this instanceof SimpleDOWN))
@@ -12,6 +15,7 @@ var fs = require('fs')
 
       AbstractLevelDOWN.call(this, location)
       this.keys = {}
+      this.keydir = keydir()
       this.stream = null
       this.position = 0
       this.fd = null
@@ -95,6 +99,7 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
         position: position
       , size: data.length
     }
+    self.keydir.put(key)
 
     callback()
   })
@@ -115,16 +120,14 @@ SimpleDOWN.prototype._del = function (key, options, callback) {
       return callback(err)
 
     delete self.keys[key]
+    self.keydir.del(key)
+
     callback()
   })
 }
 
-SimpleDOWN.prototype._get = function (key, options, callback) {
-  if (!(this.keys[key]))
-    return setImmediate(callback.bind(null, new Error('NotFound:')))
-
-  var meta = this.keys[key]
-    , buffer = new Buffer(meta.size)
+SimpleDOWN.prototype._read = function (meta, options, callback) {
+  var buffer = new Buffer(meta.size)
 
   fs.read(this.fd, buffer, 0, buffer.length, meta.position, function (err) {
     if (err)
@@ -137,6 +140,15 @@ SimpleDOWN.prototype._get = function (key, options, callback) {
 
     callback(null, value)
   })
+}
+
+SimpleDOWN.prototype._get = function (key, options, callback) {
+  if (!(this.keys[key]))
+    return setImmediate(callback.bind(null, new Error('NotFound:')))
+
+  var meta = this.keys[key]
+
+  this._read(meta, options, callback)
 }
 
 SimpleDOWN.prototype._batch = function (batch, options, callback) {
@@ -178,14 +190,21 @@ SimpleDOWN.prototype._batch = function (batch, options, callback) {
       return callback(err)
 
     batch.forEach(function (row) {
-      if (row.type === 'put')
+      if (row.type === 'put') {
         self.keys[row.key] = keysDelta[row.key]
-      else
+        self.keydir.put(row.key)
+      } else {
         delete self.keys[row.key]
+        self.keydir.del(row.key)
+      }
     })
 
     callback()
   })
+}
+
+SimpleDOWN.prototype._iterator = function (options) {
+  return new SimpleIterator(this, options)
 }
 
 module.exports = SimpleDOWN
