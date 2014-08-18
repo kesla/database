@@ -17,6 +17,19 @@ var fs = require('fs')
       this.fd = null
     }
 
+  , encode = function (obj) {
+      return obj.type === 'put' ?
+        Data.encode({ key: obj.key, value: obj.value, deleted: false })
+        :
+        Data.encode({ key: obj.key, deleted: true })
+    }
+  , ensureBuffer = function (data) {
+      if (data !== null && data !== undefined && !Buffer.isBuffer(data))
+        data = new Buffer(String(data))
+
+      return data
+    }
+
 require('util').inherits(SimpleDOWN, AbstractLevelDOWN)
 
 SimpleDOWN.prototype._open = function (options, callback) {
@@ -63,26 +76,23 @@ SimpleDOWN.prototype._append = function (data, callback) {
     if (err)
       return callback(err)
 
-    callback(null, oldPosition, size)
+    callback(null, oldPosition + size)
   })
 }
 
 SimpleDOWN.prototype._put = function (key, value, options, callback) {
-  if (!Buffer.isBuffer(key))
-    key = new Buffer(String(key))
-
-  if (!Buffer.isBuffer(value))
-    value = new Buffer(String(value))
+  key = ensureBuffer(key)
+  value = ensureBuffer(value)
 
   var data = Data.encode({ key: key, value: value, deleted: false })
     , self = this
 
-  this._append(data, function (err, oldPosition, size) {
+  this._append(data, function (err, position) {
     if (err)
       return callback(err)
 
     self.keys[key] = {
-        position: oldPosition + size
+        position: position
       , size: data.length
     }
 
@@ -127,7 +137,55 @@ SimpleDOWN.prototype._get = function (key, options, callback) {
 
     callback(null, value)
   })
+}
 
+SimpleDOWN.prototype._batch = function (batch, options, callback) {
+  var self = this
+    , keysDelta = {}
+    , buffers = []
+
+  if(batch.length === 0)
+    return setImmediate(callback)
+
+  batch = batch.map(function (row) {
+    return {
+        type: row.type
+      , key: ensureBuffer(row.key)
+      , value: ensureBuffer(row.value)
+    }
+  })
+
+  batch.forEach(function (row) {
+    var data = encode(row)
+      , size = varint.encodingLength(data.length)
+      , buffer = new Buffer(size + data.length)
+      , oldPosition = self.position
+
+    self.position += buffer.length
+
+    varint.encode(data.length, buffer)
+    data.copy(buffer, size)
+    buffers.push(buffer)
+    if (row.type === 'put')
+      keysDelta[row.key] = {
+          position: oldPosition + size
+        , size: data.length
+      }
+  })
+
+  this.stream.write(Buffer.concat(buffers), function (err) {
+    if (err)
+      return callback(err)
+
+    batch.forEach(function (row) {
+      if (row.type === 'put')
+        self.keys[row.key] = keysDelta[row.key]
+      else
+        delete self.keys[row.key]
+    })
+
+    callback()
+  })
 }
 
 module.exports = SimpleDOWN
