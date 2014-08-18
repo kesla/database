@@ -26,3 +26,5 @@ require('abstract-leveldown/abstract/chained-batch-test').all(factory, test, tes
 require('abstract-leveldown/abstract/close-test').close(factory, test, testCommon)
 
 require('abstract-leveldown/abstract/ranges-test').all(factory, test, testCommon)
+
+require('./open-close-test').all(factory, test, testCommon)

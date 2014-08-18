@@ -14,6 +14,7 @@ var fs = require('fs')
         return new SimpleDOWN(location)
 
       AbstractLevelDOWN.call(this, location)
+      this.filename = location + '/DATA'
       this.keys = {}
       this.keydir = keydir()
       this.stream = null
@@ -43,20 +44,55 @@ SimpleDOWN.prototype._open = function (options, callback) {
     if (err)
       return callback(err)
 
-    appendStream(self.location + '/DATA', function (err, stream) {
+    appendStream(self.filename, { flags: 'a+' }, function (err, stream) {
       if (err)
         return callback(err)
 
-      self.stream = stream
-
-      fs.open(self.location + '/DATA', 'r', function (err, fd) {
+      self._readDataFile(function (err) {
         if (err)
           return callback(err)
 
-        self.fd = fd
+        self.stream = stream
+        self.fd = stream.fd
         callback()
       })
     })
+  })
+}
+
+SimpleDOWN.prototype._readDataFile = function (callback) {
+  var self = this
+
+  fs.readFile(this.filename, function (err, file) {
+    if (err)
+      return callback(err)
+
+    var position = 0
+      , length
+      , data
+
+    while(position < file.length) {
+      length = varint.decode(file, position)
+
+      position += varint.decode.bytes
+
+      data = Data.decode(file.slice(position, position + length))
+      if (data.deleted) {
+        delete self.keys[data.key]
+        self.keydir.del(data.key)
+      } else {
+        self.keys[data.key] = {
+            position: position
+          , size: length
+        }
+        self.keydir.put(data.key)
+      }
+      position += length
+    }
+
+    self.position = file.length
+
+    callback()
   })
 }
 
