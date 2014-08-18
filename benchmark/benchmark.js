@@ -1,4 +1,6 @@
-var medeadown = require('medeadown')
+var rimraf = require('rimraf')
+
+  , medeadown = require('medeadown')
   , simpledown = require('../db')
 
   , LARGE_VALUE = Array
@@ -40,6 +42,7 @@ require('co')(function *() {
   var db
   for(var i = 0; i < dbs.length; ++i) {
     var db = dbs[i]
+    rimraf.sync(__dirname + '/' + db.name)
     yield benchmark(db.name + '.open', db.instance.open.bind(db.instance))
     yield benchmark(db.name + '.put small', put(db.instance, 'boop'))
     yield benchmark(db.name + '.get small', get(db.instance))
