@@ -8,6 +8,15 @@ var rimraf = require('rimraf')
       .map(function () { return 'boop' })
       .join('')
 
+    , put = function (db, value) {
+        return function * () {
+          for(var i = 0; i < 10000; ++i) {
+            yield function (done) {
+              db.put('beep' + i, value, done)
+            }
+          }
+        }
+      }
   , get = function (db) {
       return function * () {
         for(var i = 0; i < 10000; ++i) {
@@ -17,13 +26,11 @@ var rimraf = require('rimraf')
         }
       }
     }
-  , put = function (db, value) {
+  , iterator = function (db, options) {
+      var iterator = db.iterator(options)
       return function * () {
-        for(var i = 0; i < 10000; ++i) {
-          yield function (done) {
-            db.put('beep' + i, value, done)
-          }
-        }
+        while((data = yield iterator.next.bind(iterator)));
+        yield iterator.end.bind(iterator)
       }
     }
   , benchmark = function(name, yieldable) {
@@ -37,17 +44,28 @@ var rimraf = require('rimraf')
         { name: 'medea', instance: medeadown(__dirname + '/medea') }
       , { name: 'simple', instance: simpledown(__dirname + '/simple') }
     ]
+  , inputs = [
+        { name: 'small', value: 'boop' }
+      , { name: 'large', value: LARGE_VALUE }
+    ]
 
 require('co')(function *() {
   var db
+    , input
+
   for(var i = 0; i < dbs.length; ++i) {
     var db = dbs[i]
     rimraf.sync(__dirname + '/' + db.name)
     yield benchmark(db.name + '.open', db.instance.open.bind(db.instance))
-    yield benchmark(db.name + '.put small', put(db.instance, 'boop'))
-    yield benchmark(db.name + '.get small', get(db.instance))
-    yield benchmark(db.name + '.put large', put(db.instance, LARGE_VALUE))
-    yield benchmark(db.name + '.get large', get(db.instance))
+    for(var j = 0; j < inputs.length; ++j) {
+      var input = inputs[j]
+      console.log(input.name + ':')
+      yield benchmark(db.name + '.put', put(db.instance, input.value))
+      yield benchmark(db.name + '.get', get(db.instance))
+      yield benchmark(db.name + '.iterator (100%)', iterator(db.instance))
+      yield benchmark(db.name + '.iterator ( 10%)', iterator(db.instance, { limit: 1000 }))
+      yield benchmark(db.name + '.iterator (  1%)', iterator(db.instance, { limit: 100 }))
+    }
     yield benchmark(db.name + '.close', db.instance.close.bind(db.instance))
     console.log()
   }
