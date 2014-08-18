@@ -1,5 +1,5 @@
 message Data {
   required bytes key  = 1;
-  required bytes value = 2;
+  optional bytes value = 2;
   required bool deleted = 3;
 }

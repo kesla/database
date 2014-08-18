@@ -48,15 +48,8 @@ SimpleDOWN.prototype._close = function (callback) {
   fs.close(this.fd, callback)
 }
 
-SimpleDOWN.prototype._put = function (key, value, options, callback) {
-  if (!Buffer.isBuffer(key))
-    key = new Buffer(String(key))
-
-  if (!Buffer.isBuffer(value))
-    value = new Buffer(String(value))
-
+SimpleDOWN.prototype._append = function (data, callback) {
   var self = this
-    , data = Data.encode({ key: key, value: value, deleted: false })
     , size = varint.encodingLength(data.length)
     , buffer = new Buffer(size + data.length)
     , oldPosition = this.position
@@ -70,11 +63,48 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
     if (err)
       return callback(err)
 
+    callback(null, oldPosition, size)
+  })
+}
+
+SimpleDOWN.prototype._put = function (key, value, options, callback) {
+  if (!Buffer.isBuffer(key))
+    key = new Buffer(String(key))
+
+  if (!Buffer.isBuffer(value))
+    value = new Buffer(String(value))
+
+  var data = Data.encode({ key: key, value: value, deleted: false })
+    , self = this
+
+  this._append(data, function (err, oldPosition, size) {
+    if (err)
+      return callback(err)
+
     self.keys[key] = {
         position: oldPosition + size
       , size: data.length
     }
 
+    callback()
+  })
+}
+
+SimpleDOWN.prototype._del = function (key, options, callback) {
+  if (!(this.keys[key]))
+    return setImmediate(callback)
+
+  if (!Buffer.isBuffer(key))
+    key = new Buffer(String(key))
+
+  var self = this
+    , data = Data.encode({ key: key, deleted: true })
+
+  this._append(data, function (err) {
+    if (err)
+      return callback(err)
+
+    delete self.keys[key]
     callback()
   })
 }
