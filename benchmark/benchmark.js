@@ -8,15 +8,27 @@ var rimraf = require('rimraf')
       .map(function () { return 'boop' })
       .join('')
 
-    , put = function (db, value) {
-        return function * () {
-          for(var i = 0; i < 10000; ++i) {
-            yield function (done) {
-              db.put('beep' + i, value, done)
-            }
+  , put = function (db, value) {
+      return function * () {
+        for(var i = 0; i < 10000; ++i) {
+          yield function (done) {
+            db.put('beep' + i, value, done)
           }
         }
       }
+    }
+  , batch = function (db, value) {
+      return function * () {
+        var batch = []
+
+        for(var i = 0; i < 10000; ++i)
+          batch.push({ type: 'put', key: 'beep' + i, value: value })
+
+        yield function (done) {
+          db.batch(batch, done)
+        }
+      }
+    }
   , get = function (db) {
       return function * () {
         for(var i = 0; i < 10000; ++i) {
@@ -61,6 +73,7 @@ require('co')(function *() {
       var input = inputs[j]
       console.log(input.name + ':')
       yield benchmark(db.name + '.put', put(db.instance, input.value))
+      yield benchmark(db.name + '.batch', batch(db.instance, input.value))
       yield benchmark(db.name + '.get', get(db.instance))
       yield benchmark(db.name + '.iterator (100%)', iterator(db.instance))
       yield benchmark(db.name + '.iterator ( 10%)', iterator(db.instance, { limit: 1000 }))
