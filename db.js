@@ -6,6 +6,7 @@ var fs = require('fs')
   , open = require('leveldown-open')
   , series = require('run-series')
   , Skipfile = require('skipfile')
+  , snappy = require('snappy')
 
   , SimpleIterator = require('./iterator')
 
@@ -84,22 +85,27 @@ SimpleDOWN.prototype._close = function (callback) {
   this.skipfile.close(callback)
 }
 
-SimpleDOWN.prototype._put = function (key, value, options, callback) {
+SimpleDOWN.prototype._put = function (key, _value, options, callback) {
+  var self = this
+
   key = ensureBuffer(key)
-  value = ensureBuffer(value)
 
-  var data = Data.encode({ key: key, value: value, deleted: false })
-    , self = this
-    , position = this.skipfile.size
-
-  this.skipfile.append(data, function (err) {
+  snappy.compress(_value, function (err, value) {
     if (err)
       return callback(err)
 
-    self.keys[key] = position
-    self.keydir.put(key)
+    var data = Data.encode({ key: key, value: value, deleted: false })
+      , position = self.skipfile.size
 
-    callback()
+    self.skipfile.append(data, function (err) {
+      if (err)
+        return callback(err)
+
+      self.keys[key] = position
+      self.keydir.put(key)
+
+      callback()
+    })
   })
 }
 
@@ -131,10 +137,7 @@ SimpleDOWN.prototype._read = function (position, options, callback) {
 
     var value = Data.decode(buffer).value
 
-    if (options.asBuffer === false)
-      value = value.toString()
-
-    callback(null, value)
+    snappy.uncompress(value, options, callback)
   })
 }
 
