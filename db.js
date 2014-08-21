@@ -1,11 +1,11 @@
 var fs = require('fs')
 
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
-  , appendStream = require('append-stream')
   , Data = require('protocol-buffers/require')('schema.proto').Data
   , keydir = require('keydir')
   , open = require('leveldown-open')
-  , varint = require('varint')
+  , series = require('run-series')
+  , Skipfile = require('skipfile')
 
   , SimpleIterator = require('./iterator')
 
@@ -17,9 +17,8 @@ var fs = require('fs')
       this.filename = location + '/DATA'
       this.keys = {}
       this.keydir = keydir()
-      this.stream = null
       this.position = 0
-      this.fd = null
+      this.skipfile = null
     }
 
   , encode = function (obj) {
@@ -44,82 +43,45 @@ SimpleDOWN.prototype._open = function (options, callback) {
     if (err)
       return callback(err)
 
-    appendStream(self.filename, { flags: 'a+' }, function (err, stream) {
-      if (err)
-        return callback(err)
+    Skipfile({ filename: self.filename }, function (err, skipfile) {
+      self.skipfile = skipfile
 
-      self._readDataFile(function (err) {
-        if (err)
-          return callback(err)
-
-        self.stream = stream
-        self.fd = stream.fd
-        callback()
-      })
+      self._readDataFile(callback)
     })
   })
 }
 
 SimpleDOWN.prototype._readDataFile = function (callback) {
   var self = this
+    , read = function (position) {
+        if (position >= self.skipfile.size)
+          return callback(null)
 
-  fs.readFile(this.filename, function (err, file) {
-    if (err)
-      return callback(err)
+        self.skipfile.forward(position, function (err, seq, nextPosition, buffer) {
+          if (err)
+            return callback(err)
 
-    var position = 0
-      , length
-      , data
+          var data = Data.decode(buffer)
 
-    while(position < file.length) {
-      length = varint.decode(file, position)
+          if (data.deleted) {
+            delete self.keys[data.key]
+            self.keydir.del(data.key)
+          } else {
+            self.keys[data.key] = position
+            self.keydir.put(data.key)
+          }
 
-      position += varint.decode.bytes
-
-      data = Data.decode(file.slice(position, position + length))
-      if (data.deleted) {
-        delete self.keys[data.key]
-        self.keydir.del(data.key)
-      } else {
-        self.keys[data.key] = {
-            position: position
-          , size: length
-        }
-        self.keydir.put(data.key)
+          read(nextPosition + 1)
+        })
       }
-      position += length
-    }
 
-    self.position = file.length
-
-    callback()
-  })
+  read(0)
 }
 
 SimpleDOWN.prototype._close = function (callback) {
-  this.stream.end()
-  fs.close(this.fd, callback)
   this.keys = undefined
   this.keydir = undefined
-}
-
-SimpleDOWN.prototype._append = function (data, callback) {
-  var self = this
-    , size = varint.encodingLength(data.length)
-    , buffer = new Buffer(size + data.length)
-    , oldPosition = this.position
-
-  this.position += buffer.length
-
-  varint.encode(data.length, buffer)
-  data.copy(buffer, size)
-
-  this.stream.write(buffer, function (err) {
-    if (err)
-      return callback(err)
-
-    callback(null, oldPosition + size)
-  })
+  this.skipfile.close(callback)
 }
 
 SimpleDOWN.prototype._put = function (key, value, options, callback) {
@@ -128,15 +90,13 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
 
   var data = Data.encode({ key: key, value: value, deleted: false })
     , self = this
+    , position = this.skipfile.size
 
-  this._append(data, function (err, position) {
+  this.skipfile.append(data, function (err) {
     if (err)
       return callback(err)
 
-    self.keys[key] = {
-        position: position
-      , size: data.length
-    }
+    self.keys[key] = position
     self.keydir.put(key)
 
     callback()
@@ -144,7 +104,7 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
 }
 
 SimpleDOWN.prototype._del = function (key, options, callback) {
-  if (!(this.keys[key]))
+  if (this.keys[key] === undefined)
     return setImmediate(callback)
 
   if (!Buffer.isBuffer(key))
@@ -153,7 +113,7 @@ SimpleDOWN.prototype._del = function (key, options, callback) {
   var self = this
     , data = Data.encode({ key: key, deleted: true })
 
-  this._append(data, function (err) {
+  this.skipfile.append(data, function (err) {
     if (err)
       return callback(err)
 
@@ -164,10 +124,8 @@ SimpleDOWN.prototype._del = function (key, options, callback) {
   })
 }
 
-SimpleDOWN.prototype._read = function (meta, options, callback) {
-  var buffer = new Buffer(meta.size)
-
-  fs.read(this.fd, buffer, 0, buffer.length, meta.position, function (err) {
+SimpleDOWN.prototype._read = function (position, options, callback) {
+  this.skipfile.forward(position, function (err, seq, pos, buffer) {
     if (err)
       return callback(err)
 
@@ -181,64 +139,29 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
 }
 
 SimpleDOWN.prototype._get = function (key, options, callback) {
-  if (!(this.keys[key]))
+  if (this.keys[key] === undefined)
     return setImmediate(callback.bind(null, new Error('NotFound:')))
 
-  var meta = this.keys[key]
+  var position = this.keys[key]
 
-  this._read(meta, options, callback)
+  this._read(position, options, callback)
 }
 
+// TODO: make atomic - if I want to support this at all?
 SimpleDOWN.prototype._batch = function (batch, options, callback) {
   var self = this
-    , keysDelta = {}
-    , buffers = []
 
-  if(batch.length === 0)
-    return setImmediate(callback)
-
-  batch = batch.map(function (row) {
-    return {
-        type: row.type
-      , key: ensureBuffer(row.key)
-      , value: ensureBuffer(row.value)
-    }
-  })
-
-  batch.forEach(function (row) {
-    var data = encode(row)
-      , size = varint.encodingLength(data.length)
-      , buffer = new Buffer(size + data.length)
-      , oldPosition = self.position
-
-    self.position += buffer.length
-
-    varint.encode(data.length, buffer)
-    data.copy(buffer, size)
-    buffers.push(buffer)
-    if (row.type === 'put')
-      keysDelta[row.key] = {
-          position: oldPosition + size
-        , size: data.length
-      }
-  })
-
-  this.stream.write(Buffer.concat(buffers), function (err) {
-    if (err)
-      return callback(err)
-
-    batch.forEach(function (row) {
-      if (row.type === 'put') {
-        self.keys[row.key] = keysDelta[row.key]
-        self.keydir.put(row.key)
-      } else {
-        delete self.keys[row.key]
-        self.keydir.del(row.key)
-      }
-    })
-
-    callback()
-  })
+  series(
+      batch.map(function (row) {
+        return function (done) {
+          if (row.type === 'put')
+            self.put(row.key, row.value, done)
+          else
+            self.del(row.key, done)
+        }
+      })
+    , callback
+  )
 }
 
 SimpleDOWN.prototype._iterator = function (options) {
