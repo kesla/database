@@ -2,7 +2,6 @@ var test       = require('tape')
   , testCommon = require('abstract-leveldown/testCommon')
   , factory  = require('./db')
   , testBuffer = require('fs').readFileSync(__filename)
-  , db
 
 /*** compatibility with basic LevelDOWN API ***/
 

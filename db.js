@@ -1,6 +1,4 @@
-var fs = require('fs')
-
-  , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
+var AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
   , Data = require('protocol-buffers/require')('schema.proto').Data
   , keydir = require('keydir')
   , open = require('leveldown-open')
@@ -45,6 +43,9 @@ SimpleDOWN.prototype._open = function (options, callback) {
       return callback(err)
 
     Skipfile({ filename: self.filename }, function (err, skipfile) {
+      if (err)
+        return callback(err)
+
       self.skipfile = skipfile
 
       self._readDataFile(callback)
@@ -172,3 +173,4 @@ SimpleDOWN.prototype._iterator = function (options) {
 }
 
 module.exports = SimpleDOWN
+module.exports.Iterator = SimpleIterator
