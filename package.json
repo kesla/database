@@ -9,9 +9,9 @@
     "keydir": "^2.1.0",
     "leveldown-open": "^1.0.1",
     "protocol-buffers": "^2.3.4",
-    "run-series": "^1.0.2",
-    "skipfile": "git://github.com/hij1nx/skipfile",
-    "snappy": "^3.0.3"
+    "snappy": "^3.0.3",
+    "varint": "^3.0.1",
+    "run-series": "~1.0.2"
   },
   "devDependencies": {
     "rimraf": "^2.2.8",
