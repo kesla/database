@@ -1,4 +1,6 @@
-var AbstractIterator = require('abstract-leveldown').AbstractIterator
+var fs = require('fs')
+
+  , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
   , SimpleIterator = function (db, options) {
       AbstractIterator.call(this, db)
@@ -29,9 +31,6 @@ SimpleIterator.prototype._next = function (callback) {
   this.idx++
 
   this.db._read(meta, { asBuffer: this.valueAsBuffer }, function (err, value) {
-    if (err)
-      return callback(err)
-
     if (!self.keyAsBuffer)
       key = key.toString()
 
