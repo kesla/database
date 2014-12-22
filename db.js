@@ -2,9 +2,12 @@ var fs = require('fs')
 
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
   , appendStream = require('append-stream')
+  , collect = require('collect-stream')
   , Data = require('protocol-buffers/require')('schema.proto').Data
   , keydir = require('keydir')
   , open = require('leveldown-open')
+  , Orderable = require('Orderable')
+  , snappy = require('snappy')
   , varint = require('varint')
 
   , SimpleIterator = require('./iterator')
@@ -122,24 +125,30 @@ SimpleDOWN.prototype._append = function (data, callback) {
   })
 }
 
-SimpleDOWN.prototype._put = function (key, value, options, callback) {
+SimpleDOWN.prototype._put = function (key, _value, options, callback) {
+  var self = this
+
   key = ensureBuffer(key)
-  value = ensureBuffer(value)
+  _value = ensureBuffer(_value)
 
-  var data = Data.encode({ key: key, value: value, deleted: false })
-    , self = this
-
-  this._append(data, function (err, position) {
+  snappy.compress(_value, function (err, value) {
     if (err)
       return callback(err)
 
-    self.keys[key] = {
-        position: position
-      , size: data.length
-    }
-    self.keydir.put(key)
+    var data = Data.encode({ key: key, value: value, deleted: false })
 
-    callback()
+    self._append(data, function (err, position) {
+      if (err)
+        return callback(err)
+
+      self.keys[key] = {
+          position: position
+        , size: data.length
+      }
+      self.keydir.put(key)
+
+      callback()
+    })
   })
 }
 
@@ -171,12 +180,14 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
     if (err)
       return callback(err)
 
-    var value = Data.decode(buffer).value
+    var _value = Data.decode(buffer).value
 
-    if (options.asBuffer === false)
-      value = value.toString()
+    snappy.uncompress(_value, options, function (err, value) {
+      if (err)
+        return callback(err)
 
-    callback(null, value)
+      callback(null, value)
+    })
   })
 }
 
@@ -192,52 +203,70 @@ SimpleDOWN.prototype._get = function (key, options, callback) {
 SimpleDOWN.prototype._batch = function (batch, options, callback) {
   var self = this
     , keysDelta = {}
-    , buffers = []
+    , batchStream = Orderable()
 
   if(batch.length === 0)
     return setImmediate(callback)
 
-  batch = batch.map(function (row) {
-    return {
-        type: row.type
-      , key: ensureBuffer(row.key)
-      , value: ensureBuffer(row.value)
+
+  batch.forEach(function (row, index) {
+    var key = ensureBuffer(row.key)
+      , value = ensureBuffer(row.value)
+
+    if (row.type === 'del') {
+      batchStream.set(index, { type: 'del', key: key })
+      return
     }
-  })
 
-  batch.forEach(function (row) {
-    var data = encode(row)
-      , size = varint.encodingLength(data.length)
-      , buffer = new Buffer(size + data.length)
-      , oldPosition = self.position
-
-    self.position += buffer.length
-
-    varint.encode(data.length, buffer)
-    data.copy(buffer, size)
-    buffers.push(buffer)
-    if (row.type === 'put')
-      keysDelta[row.key] = {
-          position: oldPosition + size
-        , size: data.length
+    snappy.compress(value, function (err, value) {
+      if (err) {
+        return batchStream.emit('error', err)
       }
-  })
 
-  this.stream.write(Buffer.concat(buffers), function (err) {
-    if (err)
-      return callback(err)
-
-    batch.forEach(function (row) {
-      if (row.type === 'put') {
-        self.keys[row.key] = keysDelta[row.key]
-        self.keydir.put(row.key)
-      } else {
-        delete self.keys[row.key]
-        self.keydir.del(row.key)
-      }
+      batchStream.set(index, { type: 'put', key: key, value: value })
     })
+  })
 
-    callback()
+  batchStream.set(batch.length, null)
+
+  collect(batchStream, function (err, batch) {
+
+    var buffers = batch.map(function (row) {
+          var data = encode(row)
+            , size = varint.encodingLength(data.length)
+            , buffer = new Buffer(size + data.length)
+            , oldPosition = self.position
+
+          self.position += buffer.length
+
+          varint.encode(data.length, buffer)
+          data.copy(buffer, size)
+          if (row.type === 'put')
+            keysDelta[row.key] = {
+                position: oldPosition + size
+              , size: data.length
+            }
+
+          return buffer
+        })
+
+
+    self.stream.write(Buffer.concat(buffers), function (err) {
+      if (err)
+        return callback(err)
+
+      batch.forEach(function (row) {
+        if (row.type === 'put') {
+          self.keys[row.key] = keysDelta[row.key]
+          self.keydir.put(row.key)
+        } else {
+          delete self.keys[row.key]
+          self.keydir.del(row.key)
+        }
+      })
+
+      callback()
+    })
   })
 }
 
