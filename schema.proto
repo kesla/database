@@ -1,5 +1,10 @@
+enum TYPE {
+  put = 1;
+  del = 2;
+}
+
 message Data {
   required bytes key  = 1;
   optional bytes value = 2;
-  required bool deleted = 3;
+  required TYPE type = 3;
 }

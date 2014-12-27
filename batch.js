@@ -4,18 +4,12 @@ var AbstractBatch = require('abstract-leveldown/abstract-chained-batch')
   , snappy = require('snappy')
   , varint = require('varint')
 
-  , Data = require('protocol-buffers/require')('schema.proto').Data
+  , encoding = require('./encoding')
 
   , SimpleBatch = function (db) {
       AbstractBatch.call(this, db)
       this._stream = Orderable()
       this._index = 0
-    }
-  , encode = function (obj) {
-      return obj.type === 'put' ?
-        Data.encode({ key: obj.key, value: obj.value, deleted: false })
-        :
-        Data.encode({ key: obj.key, deleted: true })
     }
   , put = function (key, _value, index, stream) {
 
@@ -59,7 +53,7 @@ SimpleBatch.prototype._write = function (callback) {
   collect(this._stream, function (err, batch) {
 
     var buffers = batch.map(function (row) {
-          var data = encode(row)
+          var data = encoding.encode(row)
             , size = varint.encodingLength(data.length)
             , buffer = new Buffer(size + data.length)
             , oldPosition = self._db.position

@@ -2,13 +2,13 @@ var fs = require('fs')
 
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
   , appendStream = require('append-stream')
-  , Data = require('protocol-buffers/require')('schema.proto').Data
   , keydir = require('keydir')
   , open = require('leveldown-open')
   , snappy = require('snappy')
   , varint = require('varint')
 
   , ChainedBatch = require('./batch')
+  , encoding = require('./encoding')
   , SimpleIterator = require('./iterator')
 
   , SimpleDOWN = function (location) {
@@ -24,12 +24,6 @@ var fs = require('fs')
       this.fd = null
     }
 
-  , encode = function (obj) {
-      return obj.type === 'put' ?
-        Data.encode({ key: obj.key, value: obj.value, deleted: false })
-        :
-        Data.encode({ key: obj.key, deleted: true })
-    }
   , ensureBuffer = function (data) {
       if (data !== null && data !== undefined && !Buffer.isBuffer(data))
         data = new Buffer(String(data))
@@ -78,7 +72,7 @@ SimpleDOWN.prototype._readDataFile = function (callback) {
 
       position += varint.decode.bytes
 
-      data = Data.decode(file.slice(position, position + length))
+      data = encoding.decode(file.slice(position, position + length))
       if (data.deleted) {
         delete self.keys[data.key]
         self.keydir.del(data.key)
@@ -133,7 +127,7 @@ SimpleDOWN.prototype._put = function (key, _value, options, callback) {
     if (err)
       return callback(err)
 
-    var data = Data.encode({ key: key, value: value, deleted: false })
+    var data = encoding.encode({ type: 'put', key: key, value: value })
 
     self._append(data, function (err, position) {
       if (err)
@@ -158,7 +152,7 @@ SimpleDOWN.prototype._del = function (key, options, callback) {
     key = new Buffer(String(key))
 
   var self = this
-    , data = Data.encode({ key: key, deleted: true })
+    , data = encoding.encode({ type: 'del', key: key })
 
   this._append(data, function (err) {
     if (err)
@@ -178,7 +172,7 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
     if (err)
       return callback(err)
 
-    var _value = Data.decode(buffer).value
+    var _value = encoding.decode(buffer).value
 
     snappy.uncompress(_value, options, function (err, value) {
       if (err)
