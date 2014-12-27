@@ -69,7 +69,7 @@ SimpleDOWN.prototype._readDataFile = function (callback) {
       position += varint.decode.bytes
 
       data = encoding.decodeMeta(file.slice(position, position + length))
-      if (data.deleted) {
+      if (data.type === 'del') {
         delete self.keys[data.key]
         self.keydir.del(data.key)
       } else {

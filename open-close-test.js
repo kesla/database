@@ -1,4 +1,6 @@
-var location
+var util = require('abstract-leveldown/abstract/util')
+
+  , location
 
 module.exports.setUp = function (test, testCommon) {
   location = testCommon.location()
@@ -18,15 +20,21 @@ module.exports.populate = function (leveldown, test) {
   })
 
   test('populate', function (t) {
-    db.put('hello', 'world', function () {
-      db.del('hello', function () {
+    db.batch()
+      .put('deleted', 'value')
+      .put('hello', 'world')
+      .write(function () {
         db.batch()
-          .put('hello', 'world2')
-          .del('hellz')
-          .put('hellz', 'worldz')
-          .write(t.end.bind(t))
+          .del('deleted')
+          .del('hello')
+          .write(function () {
+            db.batch()
+              .put('hello', 'world2')
+              .del('hellz')
+              .put('hellz', 'worldz')
+              .write(t.end.bind(t))
+          })
       })
-    })
   })
 
   test('close', function (t) {
@@ -60,7 +68,13 @@ module.exports.get = function (leveldown, test) {
         db.get('foo', { asBuffer: false }, function (err, value) {
           t.notOk(err)
           t.equal(value, 'bar')
-          t.end()
+          db.get('deleted', function (err) {
+            t.ok(err)
+            if (err) {
+              t.ok(util.verifyNotFoundError(err), 'NotFound error')
+            }
+            t.end()
+          })
         })
       })
     })
