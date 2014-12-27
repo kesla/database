@@ -10,6 +10,7 @@ var fs = require('fs')
   , snappy = require('snappy')
   , varint = require('varint')
 
+  , ChainedBatch = require('./batch')
   , SimpleIterator = require('./iterator')
 
   , SimpleDOWN = function (location) {
@@ -198,6 +199,10 @@ SimpleDOWN.prototype._get = function (key, options, callback) {
   var meta = this.keys[key]
 
   this._read(meta, options, callback)
+}
+
+SimpleDOWN.prototype._chainedBatch = function () {
+  return new ChainedBatch(this)
 }
 
 SimpleDOWN.prototype._batch = function (batch, options, callback) {
