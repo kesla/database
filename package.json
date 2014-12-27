@@ -7,6 +7,7 @@
     "abstract-leveldown": "^0.12.3",
     "append-stream": "^1.2.2",
     "collect-stream": "^1.0.0",
+    "dezalgo": "^1.0.1",
     "keydir": "^2.1.0",
     "leveldown-open": "^1.0.1",
     "orderable": "^1.1.3",

@@ -2,6 +2,7 @@ var fs = require('fs')
 
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
   , appendStream = require('append-stream')
+  , dz = require('dezalgo')
   , keydir = require('keydir')
   , open = require('leveldown-open')
   , snappy = require('snappy')
@@ -141,8 +142,10 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
 }
 
 SimpleDOWN.prototype._del = function (key, options, callback) {
+  callback = dz(callback)
+
   if (!(this.keys[key]))
-    return setImmediate(callback)
+    return callback()
 
   var self = this
     , obj = { type: 'del', key: ensureBuffer(key) }
@@ -178,8 +181,10 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
 }
 
 SimpleDOWN.prototype._get = function (key, options, callback) {
+  callback = dz(callback)
+
   if (!(this.keys[key]))
-    return setImmediate(callback.bind(null, new Error('NotFound:')))
+    return callback(new Error('NotFound:'))
 
   var meta = this.keys[key]
 

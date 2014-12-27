@@ -1,4 +1,5 @@
 var AbstractIterator = require('abstract-leveldown').AbstractIterator
+  , dz = require('dezalgo')
 
   , SimpleIterator = function (db, options) {
       AbstractIterator.call(this, db)
@@ -14,13 +15,13 @@ var AbstractIterator = require('abstract-leveldown').AbstractIterator
       this.idx = 0
     }
 
-  , setImmediate = global.setImmediate || process.nextTick
-
 require('util').inherits(SimpleIterator, AbstractIterator)
 
 SimpleIterator.prototype._next = function (callback) {
+  callback = dz(callback)
+
   if (this.idx === this.keydir.length)
-    return setImmediate(callback)
+    return callback()
 
   var self = this
     , key = this.keydir[this.idx]

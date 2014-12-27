@@ -1,4 +1,5 @@
-var schema = require('protocol-buffers/require')('schema.proto')
+var dz = require('dezalgo')
+  , schema = require('protocol-buffers/require')('schema.proto')
   , snappy = require('snappy')
 
   , encodePut = function (obj, callback) {
@@ -15,20 +16,19 @@ var schema = require('protocol-buffers/require')('schema.proto')
       })
     }
   , encodeDel = function (obj, callback) {
-      setImmediate(function () {
-        var buffer = schema.Data.encode({
-                key: obj.key
-              , type: schema.TYPE.del
-            })
-        callback(null, buffer)
+      return schema.Data.encode({
+          key: obj.key
+        , type: schema.TYPE.del
       })
     }
 
   , encode = function (obj, callback) {
+      callback = dz(callback)
+
       if (obj.type === 'put')
         encodePut(obj, callback)
       else
-        encodeDel(obj, callback)
+        callback(null, encodeDel(obj))
     }
   , decode = function (buffer, options, callback) {
 
@@ -37,23 +37,22 @@ var schema = require('protocol-buffers/require')('schema.proto')
         options = {}
       }
 
+      callback = dz(callback)
+
       var obj = schema.Data.decode(buffer)
 
       obj.type = obj.type === schema.TYPE.put ? 'put' : 'del'
 
-      if (obj.type === 'del') {
-        setImmediate(function () {
-          callback(null, obj)
-        })
-      } else {
-        snappy.uncompress(obj.value, options, function (err, value) {
-          if (err) return callback(err)
+      if (obj.type === 'del')
+        return callback(null, obj)
 
-          obj.value = value
+      snappy.uncompress(obj.value, options, function (err, value) {
+        if (err) return callback(err)
 
-          callback(null, obj)
-        })
-      }
+        obj.value = value
+
+        callback(null, obj)
+      })
     }
   , decodeMeta = function (buffer) {
       var obj = schema.Data.decode(buffer)
