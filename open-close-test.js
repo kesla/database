@@ -5,7 +5,7 @@ module.exports.setUp = function (test, testCommon) {
   test('setUp', testCommon.setUp)
 }
 
-module.exports.populate = function (leveldown, test, testCommon) {
+module.exports.populate = function (leveldown, test) {
   var db
 
   test('open', function (t) {
@@ -34,7 +34,7 @@ module.exports.populate = function (leveldown, test, testCommon) {
   })
 }
 
-module.exports.get = function (leveldown, test, testCommon) {
+module.exports.get = function (leveldown, test) {
   var db
 
   test('open', function (t) {
@@ -77,7 +77,7 @@ module.exports.tearDown = function (test, testCommon) {
 
 module.exports.all = function (leveldown, test, testCommon) {
   module.exports.setUp(test, testCommon)
-  module.exports.populate(leveldown, test, testCommon)
-  module.exports.get(leveldown, test, testCommon)
+  module.exports.populate(leveldown, test)
+  module.exports.get(leveldown, test)
   module.exports.tearDown(test, testCommon)
 }

@@ -2,7 +2,6 @@ var fs = require('fs')
 
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
   , appendStream = require('append-stream')
-  , collect = require('collect-stream')
   , Data = require('protocol-buffers/require')('schema.proto').Data
   , keydir = require('keydir')
   , open = require('leveldown-open')
@@ -107,8 +106,7 @@ SimpleDOWN.prototype._close = function (callback) {
 }
 
 SimpleDOWN.prototype._append = function (data, callback) {
-  var self = this
-    , size = varint.encodingLength(data.length)
+  var size = varint.encodingLength(data.length)
     , buffer = new Buffer(size + data.length)
     , oldPosition = this.position
 
