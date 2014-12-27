@@ -1,7 +1,6 @@
 var AbstractBatch = require('abstract-leveldown/abstract-chained-batch')
   , collect = require('collect-stream')
   , Orderable = require('orderable')
-  , snappy = require('snappy')
   , varint = require('varint')
 
   , encoding = require('./encoding')
@@ -11,20 +10,23 @@ var AbstractBatch = require('abstract-leveldown/abstract-chained-batch')
       this._stream = Orderable()
       this._index = 0
     }
-  , put = function (key, _value, index, stream) {
+  , put = function (key, value, index, stream) {
 
       key = Buffer.isBuffer(key) ? key : new Buffer(String(key))
-      _value = (Buffer.isBuffer(_value) || typeof(_value) === 'string')? _value : String(_value)
+      value = (Buffer.isBuffer(value) || typeof(value) === 'string')? value : String(value)
 
-      snappy.compress(_value, function (err, value) {
+      encoding.encode({ key: key, value: value, type: 'put' }, function (err, buffer) {
         if (err) stream.emit('error', err)
-        else stream.set(index, { key: key, value: value, type: 'put' })
+        else stream.set(index, { key: key, type: 'put', buffer: buffer })
       })
     }
   , del = function (key, index, stream) {
       key = Buffer.isBuffer(key) ? key : new Buffer(String(key))
 
-      stream.set(index, { key: key, type: 'del' })
+      encoding.encode({ key: key, type: 'del' }, function (err, buffer) {
+        if (err) stream.emit('error', err)
+        else stream.set(index, { key: key, type: 'del', buffer: buffer })
+      })
     }
 
 require('util').inherits(SimpleBatch, AbstractBatch)
@@ -53,7 +55,7 @@ SimpleBatch.prototype._write = function (callback) {
   collect(this._stream, function (err, batch) {
 
     var buffers = batch.map(function (row) {
-          var data = encoding.encode(row)
+          var data = row.buffer
             , size = varint.encodingLength(data.length)
             , buffer = new Buffer(size + data.length)
             , oldPosition = self._db.position

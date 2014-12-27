@@ -117,27 +117,23 @@ SimpleDOWN.prototype._append = function (data, callback) {
   })
 }
 
-SimpleDOWN.prototype._put = function (key, _value, options, callback) {
+SimpleDOWN.prototype._put = function (key, value, options, callback) {
   var self = this
+    , obj = { type: 'put', key: ensureBuffer(key), value: ensureBuffer(value) }
 
-  key = ensureBuffer(key)
-  _value = ensureBuffer(_value)
-
-  snappy.compress(_value, function (err, value) {
+  encoding.encode(obj, function (err, buffer) {
     if (err)
       return callback(err)
 
-    var data = encoding.encode({ type: 'put', key: key, value: value })
-
-    self._append(data, function (err, position) {
+    self._append(buffer, function (err, position) {
       if (err)
         return callback(err)
 
-      self.keys[key] = {
+      self.keys[obj.key] = {
           position: position
-        , size: data.length
+        , size: buffer.length
       }
-      self.keydir.put(key)
+      self.keydir.put(obj.key)
 
       callback()
     })
@@ -148,20 +144,22 @@ SimpleDOWN.prototype._del = function (key, options, callback) {
   if (!(this.keys[key]))
     return setImmediate(callback)
 
-  if (!Buffer.isBuffer(key))
-    key = new Buffer(String(key))
-
   var self = this
-    , data = encoding.encode({ type: 'del', key: key })
+    , obj = { type: 'del', key: ensureBuffer(key) }
 
-  this._append(data, function (err) {
+  encoding.encode(obj, function (err, buffer) {
     if (err)
       return callback(err)
 
-    delete self.keys[key]
-    self.keydir.del(key)
+    self._append(buffer, function (err) {
+      if (err)
+        return callback(err)
 
-    callback()
+      delete self.keys[obj.key]
+      self.keydir.del(obj.key)
+
+      callback()
+    })
   })
 }
 
