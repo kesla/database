@@ -72,7 +72,7 @@ SimpleDOWN.prototype._readDataFile = function (callback) {
 
       position += varint.decode.bytes
 
-      data = encoding.decode(file.slice(position, position + length))
+      data = encoding.decodeMeta(file.slice(position, position + length))
       if (data.deleted) {
         delete self.keys[data.key]
         self.keydir.del(data.key)
@@ -170,13 +170,9 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
     if (err)
       return callback(err)
 
-    var _value = encoding.decode(buffer).value
-
-    snappy.uncompress(_value, options, function (err, value) {
-      if (err)
-        return callback(err)
-
-      callback(null, value)
+    encoding.decode(buffer, options, function (err, obj) {
+      if (err) return callback(err)
+      callback(null, obj.value)
     })
   })
 }

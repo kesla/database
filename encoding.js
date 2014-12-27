@@ -30,11 +30,37 @@ var schema = require('protocol-buffers/require')('schema.proto')
       else
         encodeDel(obj, callback)
     }
-  , decode = function (buffer) {
+  , decode = function (buffer, options, callback) {
+
+      if (!callback) {
+        callback = options
+        options = {}
+      }
+
       var obj = schema.Data.decode(buffer)
 
       obj.type = obj.type === schema.TYPE.put ? 'put' : 'del'
-      return obj
+
+      if (obj.type === 'del') {
+        setImmediate(function () {
+          callback(null, obj)
+        })
+      } else {
+        snappy.uncompress(obj.value, options, function (err, value) {
+          if (err) return callback(err)
+
+          obj.value = value
+
+          callback(null, obj)
+        })
+      }
+    }
+  , decodeMeta = function (buffer) {
+      var obj = schema.Data.decode(buffer)
+      return {
+            type: obj.type === schema.TYPE.put ? 'put' : 'del'
+          , key: obj.key
+      }
     }
 
-module.exports = { encode: encode, decode: decode }
+module.exports = { encode: encode, decode: decode, decodeMeta: decodeMeta }
