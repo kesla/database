@@ -6,7 +6,6 @@ var fs = require('fs')
   , Data = require('protocol-buffers/require')('schema.proto').Data
   , keydir = require('keydir')
   , open = require('leveldown-open')
-  , Orderable = require('Orderable')
   , snappy = require('snappy')
   , varint = require('varint')
 
@@ -206,73 +205,17 @@ SimpleDOWN.prototype._chainedBatch = function () {
 }
 
 SimpleDOWN.prototype._batch = function (batch, options, callback) {
-  var self = this
-    , keysDelta = {}
-    , batchStream = Orderable()
+  var chainedBatch = this._chainedBatch()
 
-  if(batch.length === 0)
-    return setImmediate(callback)
-
-
-  batch.forEach(function (row, index) {
-    var key = ensureBuffer(row.key)
-      , value = ensureBuffer(row.value)
-
+  batch.forEach(function (row) {
     if (row.type === 'del') {
-      batchStream.set(index, { type: 'del', key: key })
-      return
+      chainedBatch.del(row.key)
+    } else {
+      chainedBatch.put(row.key, row.value)
     }
-
-    snappy.compress(value, function (err, value) {
-      if (err) {
-        return batchStream.emit('error', err)
-      }
-
-      batchStream.set(index, { type: 'put', key: key, value: value })
-    })
   })
 
-  batchStream.set(batch.length, null)
-
-  collect(batchStream, function (err, batch) {
-
-    var buffers = batch.map(function (row) {
-          var data = encode(row)
-            , size = varint.encodingLength(data.length)
-            , buffer = new Buffer(size + data.length)
-            , oldPosition = self.position
-
-          self.position += buffer.length
-
-          varint.encode(data.length, buffer)
-          data.copy(buffer, size)
-          if (row.type === 'put')
-            keysDelta[row.key] = {
-                position: oldPosition + size
-              , size: data.length
-            }
-
-          return buffer
-        })
-
-
-    self.stream.write(Buffer.concat(buffers), function (err) {
-      if (err)
-        return callback(err)
-
-      batch.forEach(function (row) {
-        if (row.type === 'put') {
-          self.keys[row.key] = keysDelta[row.key]
-          self.keydir.put(row.key)
-        } else {
-          delete self.keys[row.key]
-          self.keydir.del(row.key)
-        }
-      })
-
-      callback()
-    })
-  })
+  chainedBatch.write(callback)
 }
 
 SimpleDOWN.prototype._iterator = function (options) {
