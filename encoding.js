@@ -43,8 +43,7 @@ var dz = require('dezalgo')
 
       obj.type = obj.type === schema.TYPE.put ? 'put' : 'del'
 
-      if (obj.type === 'del')
-        return callback(null, obj)
+      if (obj.type === 'del') return callback(null, obj)
 
       snappy.uncompress(obj.value, options, function (err, value) {
         if (err) return callback(err)

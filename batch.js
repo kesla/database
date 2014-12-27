@@ -74,8 +74,7 @@ SimpleBatch.prototype._write = function (callback) {
         })
 
     self._db.stream.write(Buffer.concat(buffers), function (err) {
-      if (err)
-        return callback(err)
+      if (err) return callback(err)
 
       batch.forEach(function (row) {
         if (row.type === 'put') {

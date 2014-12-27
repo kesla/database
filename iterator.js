@@ -20,8 +20,7 @@ require('util').inherits(SimpleIterator, AbstractIterator)
 SimpleIterator.prototype._next = function (callback) {
   callback = dz(callback)
 
-  if (this.idx === this.keydir.length)
-    return callback()
+  if (this.idx === this.keydir.length) return callback()
 
   var self = this
     , key = this.keydir[this.idx]

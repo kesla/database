@@ -13,8 +13,7 @@ var fs = require('fs')
   , SimpleIterator = require('./iterator')
 
   , SimpleDOWN = function (location) {
-      if (!(this instanceof SimpleDOWN))
-        return new SimpleDOWN(location)
+      if (!(this instanceof SimpleDOWN)) return new SimpleDOWN(location)
 
       AbstractLevelDOWN.call(this, location)
       this.filename = location + '/DATA'
@@ -38,16 +37,13 @@ SimpleDOWN.prototype._open = function (options, callback) {
   var self = this
 
   open(this.location, options, function (err) {
-    if (err)
-      return callback(err)
+    if (err) return callback(err)
 
     appendStream(self.filename, { flags: 'a+' }, function (err, stream) {
-      if (err)
-        return callback(err)
+      if (err) return callback(err)
 
       self._readDataFile(function (err) {
-        if (err)
-          return callback(err)
+        if (err) return callback(err)
 
         self.stream = stream
         self.fd = stream.fd
@@ -61,8 +57,7 @@ SimpleDOWN.prototype._readDataFile = function (callback) {
   var self = this
 
   fs.readFile(this.filename, function (err, file) {
-    if (err)
-      return callback(err)
+    if (err) return callback(err)
 
     var position = 0
       , length
@@ -111,8 +106,7 @@ SimpleDOWN.prototype._append = function (data, callback) {
   data.copy(buffer, size)
 
   this.stream.write(buffer, function (err) {
-    if (err)
-      return callback(err)
+    if (err) return callback(err)
 
     callback(null, oldPosition + size)
   })
@@ -123,12 +117,10 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
     , obj = { type: 'put', key: ensureBuffer(key), value: ensureBuffer(value) }
 
   encoding.encode(obj, function (err, buffer) {
-    if (err)
-      return callback(err)
+    if (err) return callback(err)
 
     self._append(buffer, function (err, position) {
-      if (err)
-        return callback(err)
+      if (err) return callback(err)
 
       self.keys[obj.key] = {
           position: position
@@ -144,19 +136,16 @@ SimpleDOWN.prototype._put = function (key, value, options, callback) {
 SimpleDOWN.prototype._del = function (key, options, callback) {
   callback = dz(callback)
 
-  if (!(this.keys[key]))
-    return callback()
+  if (!(this.keys[key])) return callback()
 
   var self = this
     , obj = { type: 'del', key: ensureBuffer(key) }
 
   encoding.encode(obj, function (err, buffer) {
-    if (err)
-      return callback(err)
+    if (err) return callback(err)
 
     self._append(buffer, function (err) {
-      if (err)
-        return callback(err)
+      if (err) return callback(err)
 
       delete self.keys[obj.key]
       self.keydir.del(obj.key)
@@ -170,8 +159,7 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
   var buffer = new Buffer(meta.size)
 
   fs.read(this.fd, buffer, 0, buffer.length, meta.position, function (err) {
-    if (err)
-      return callback(err)
+    if (err) return callback(err)
 
     encoding.decode(buffer, options, function (err, obj) {
       if (err) return callback(err)
@@ -183,8 +171,7 @@ SimpleDOWN.prototype._read = function (meta, options, callback) {
 SimpleDOWN.prototype._get = function (key, options, callback) {
   callback = dz(callback)
 
-  if (!(this.keys[key]))
-    return callback(new Error('NotFound:'))
+  if (!(this.keys[key])) return callback(new Error('NotFound:'))
 
   var meta = this.keys[key]
 
