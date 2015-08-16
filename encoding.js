@@ -5,8 +5,22 @@ var dz = require('dezalgo')
     )
   , snappy = require('snappy')
 
+  , compress = function (value, callback) {
+      if (value) {
+        snappy.compress(value, callback)
+      } else {
+        callback()
+      }
+    }
+  , uncompress = function (value, options, callback) {
+      if (Buffer.isBuffer(value)) {
+        snappy.uncompress(value, options, callback);
+      } else {
+        callback(null, new Buffer(0))
+      }
+    }
   , encodePut = function (obj, callback) {
-      snappy.compress(obj.value, function (err, value) {
+      compress(obj.value, function (err, value) {
         if (err) return callback(err)
 
         var buffer = schema.Data.encode({
@@ -48,7 +62,7 @@ var dz = require('dezalgo')
 
       if (obj.type === 'del') return callback(null, obj)
 
-      snappy.uncompress(obj.value, options, function (err, value) {
+      uncompress(obj.value, options, function (err, value) {
         if (err) return callback(err)
 
         obj.value = value

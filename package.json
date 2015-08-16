@@ -4,7 +4,7 @@
   "description": "A pure js-only db",
   "main": "db.js",
   "dependencies": {
-    "abstract-leveldown": "^0.12.3",
+    "abstract-leveldown": "^2.4.0",
     "append-stream": "^1.2.2",
     "collect-stream": "^1.0.0",
     "dezalgo": "^1.0.1",
