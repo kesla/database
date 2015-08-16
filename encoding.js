@@ -1,5 +1,8 @@
 var dz = require('dezalgo')
-  , schema = require('protocol-buffers/require')('schema.proto')
+  , fs = require('fs')
+  , schema = require('protocol-buffers')(
+      fs.readFileSync(__dirname + '/schema.proto')
+    )
   , snappy = require('snappy')
 
   , encodePut = function (obj, callback) {
